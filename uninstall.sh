@@ -24,7 +24,8 @@ fi
 
 # 2. 菜单栏
 rm -f "$HOME/Library/SwiftBar/plugins/codex.10s.sh" "$HOME/Library/SwiftBar/plugins/codex.30m.sh"
-echo -e "${GREEN}✅ SwiftBar 插件已移除${RESET}"
+defaults delete com.ameba.SwiftBar PluginDirectory 2>/dev/null || true
+echo -e "${GREEN}✅ SwiftBar 插件及配置已清除${RESET}"
 
 # 3. 别名
 sed -i '' '/alias codex=/d' "$HOME/.zshrc" 2>/dev/null || true
