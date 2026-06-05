@@ -24,6 +24,8 @@ bash install.sh --with-barrage     # 菜单栏 + 终端 + 弹幕通知
 | 适用场景 | 日常够用 | 需要每次提醒 |
 
 菜单栏和弹幕使用统一设计：**美元金额 + 相同配色**。
+菜单栏：
+<img width="493" height="402" alt="image" src="https://github.com/user-attachments/assets/bf26865b-12b5-4f91-af6a-157a34a006e9" />
 
 ## 快速参考
 
