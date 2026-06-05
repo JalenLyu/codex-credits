@@ -95,8 +95,14 @@ ln -sf "$PROJ_DIR/scripts/codex-menu-bar.sh" "$PLUGIN_DIR/codex.10s.sh"
 # 提前设好插件目录，SwiftBar 启动不会弹选择框
 defaults write com.ameba.SwiftBar PluginDirectory "$PLUGIN_DIR" 2>/dev/null || true
 
-echo -e "${GREEN}✅ 菜单栏插件已安装到 $PLUGIN_DIR${RESET}"
-echo "   安装 SwiftBar 后自动出现: brew install --cask swiftbar"
+echo -e "${GREEN}✅ 菜单栏插件已安装${RESET}"
+
+# 自动启动 SwiftBar
+if [ -d "/Applications/SwiftBar.app" ]; then
+    open -a SwiftBar 2>/dev/null && echo -e "${GREEN}✅ SwiftBar 已启动${RESET}" || true
+else
+    echo "   brew install --cask swiftbar && open -a SwiftBar"
+fi
 
 # ── 弹幕（可选） ──
 case "$MODE" in
