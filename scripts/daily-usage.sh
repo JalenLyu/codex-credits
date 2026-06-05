@@ -295,8 +295,6 @@ elif cmd == '--set-budget':
         with open(CONFIG_FILE, 'w') as f:
             json.dump(config, f, indent=2)
         print(f'✅ 周预算 \${amount:.0f}')
-        print(f'  codex --set-budget {amount:.0f}  已完成')
-        print(f'  菜单栏交替: Codex \$X ↔ Codex N%')
         print(f'  🟢<40%  🟡<70%  🟠<90%  🔴≥90%')
     else:
         budget_now = float(os.environ.get('WEEKLY_BUDGET_DOLLARS', '0') or '0')
