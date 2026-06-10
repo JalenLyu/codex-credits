@@ -20,8 +20,8 @@ class Config:
     weekly_credits: int = 1875
     tokens_per_credit: int = 3981
     cents_per_credit: int = 4
-    output_token_weight: float = 0
-    cached_token_weight: float = 0
+    output_token_weight: float = 5.0
+    cached_token_weight: float = 0.0
     reset_weekday: str = "Wednesday"
     reset_hour: int = 15
     reset_minute: int = 16
