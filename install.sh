@@ -84,8 +84,8 @@ defaults = {
     "weekly_credits": 1875,
     "tokens_per_credit": 3981,
     "cents_per_credit": 4,
-    "output_token_weight": 0,
-    "cached_token_weight": 0,
+    "output_token_weight": 5.0,
+    "cached_token_weight": 0.0,
     "reset_weekday": os.environ.get("RESET_WEEKDAY", "Wednesday"),
     "reset_hour": int(os.environ.get("RESET_HOUR", "15")),
     "reset_minute": int(os.environ.get("RESET_MINUTE", "16")),
@@ -93,6 +93,11 @@ defaults = {
 
 for key, value in defaults.items():
     config.setdefault(key, value)
+
+# 迁移：output_token_weight 从旧默认值 0 更新到 5.0
+# 仅当用户未手动修改（仍为 0）时才更新；保留用户自定义的非零值
+if config.get("output_token_weight") == 0:
+    config["output_token_weight"] = 5.0
 
 path.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 PYEOF
