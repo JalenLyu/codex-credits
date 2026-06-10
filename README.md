@@ -52,6 +52,16 @@ bash scripts/codex-menu-bar.sh   # 手动预览 SwiftBar 输出
 
 <img width="493" height="402" alt="image" src="https://github.com/user-attachments/assets/bf26865b-12b5-4f91-af6a-157a34a006e9" />
 
+## 更新
+
+发给 AI agent，一行更新：
+
+```bash
+cd ~/codex-credits && git pull && bash install.sh
+```
+
+> **原理**：SwiftBar 插件通过 symlink 指向仓库脚本，`git pull` 后 10 秒内自动生效，无需重启。
+
 ## 快速参考
 
 ```bash
@@ -86,8 +96,8 @@ dollars = billable_units × 估值费率
   "weekly_credits": 1875,
   "tokens_per_credit": 3981,
   "cents_per_credit": 4,
-  "output_token_weight": 0,
-  "cached_token_weight": 0,
+  "output_token_weight": 5.0,
+  "cached_token_weight": 0.0,
   "reset_weekday": "Wednesday",
   "reset_hour": 15,
   "reset_minute": 16
