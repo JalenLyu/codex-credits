@@ -588,30 +588,25 @@ def cmd_menu(_args):
 
     print(title)
     print("---")
-    print("Overview | color=#6B7280")
+    print("概览 | color=#6B7280")
     print(f"{icon} {status_label(report['credits_pct'])}")
     print(f"{progress_bar(report['credits_pct'], 12, '█', '□')}  {report['credits_pct']:.1f}%")
     print(f"${report['dollars_used']:.2f} / ${report['dollars_limit']:.2f} · 剩余 ${report['dollars_remaining']:.2f}")
+    print(f"🔄 刷新 | bash={cache_script} terminal=false refresh=true")
     print("---")
-    print("Usage | color=#6B7280")
+    print("用量 | color=#6B7280")
     print(f"输入 {format_token_count(report['fresh_input'])} · 输出 {format_token_count(report['output'])}")
-    print(f"缓存 {format_token_count(report['cached'])} · Billable {format_token_count(report['billable_units'])}")
+    print(f"缓存 {format_token_count(report['cached'])} · 计费 {format_token_count(report['billable_units'])}")
     model_str = ", ".join(report["models"][:3]) if report["models"] else "无模型记录"
     print(f"模型 {model_str}")
     print("---")
-    print("Billing Window | color=#6B7280")
+    print("计费周期 | color=#6B7280")
     print(f"{report['period_start'][:10]} {report['period_start'][11:16]} -> {report['period_end'][:10]} {report['period_end'][11:16]}")
     print(f"刷新 {report['updated_at'][11:19]} · {report['events']} 个计费事件")
     print("---")
-    print("Calibration | color=#6B7280")
-    print(f"起点 {report['reset_weekday']} {report['reset_hour']:02d}:{report['reset_minute']:02d}")
-    print(f"单价 {report['tokens_per_credit']:,} units/credit")
-    print(f"权重 output={report['output_token_weight']:g} cached={report['cached_token_weight']:g}")
-    print("达到限额后使用")
-    print("输入恢复时间，自动用恢复时间往前 7 天校准")
+    print("校准 | color=#6B7280")
     print(f"⚙️ 限额后时间窗口和额度校准 | bash={main_script} param1=--calibrate terminal=true")
     print("---")
-    print(f"🔄 刷新数据 | bash={cache_script} terminal=false refresh=true")
     print(f"📋 周明细 | bash={main_script} param1=--weekly terminal=true")
     print(f"💵 设置周预算 | bash={main_script} param1=--set-budget terminal=true")
     return 0
@@ -720,15 +715,16 @@ def cmd_calibrate(_args):
     cfg = load_config(paths["config_file"])
     print("Codex Credits 限额后时间窗口和额度校准")
     print()
-    print("用于在达到周限额后校准：输入 Codex 提示的额度恢复时间，脚本会用恢复时间往前 7 天作为完整窗口。")
+    print("Codex 显示达到周限额时使用。")
+    print("填入 Codex 显示的限额恢复时间；脚本会自动往前反推 7 天作为计费窗口，并校准 token 单价。")
     print()
 
-    reached = input("当前是否已经达到周限额？[y/N]: ").strip().lower()
+    reached = input("Codex 当前是否已经显示达到周限额？[y/N]: ").strip().lower()
     if reached not in ("y", "yes"):
-        print("未达到周限额时不建议校准单价。可以先使用 codex --calibrate-start 校准首次使用/重置时间。")
+        print("未看到限额提示时不建议校准。等 Codex 显示限额恢复时间后，再运行此命令。")
         return 0
 
-    recovery_text = input("额度恢复时间（例如 2026-06-10 15:16，默认 CST）: ").strip()
+    recovery_text = input("Codex 显示的限额恢复时间（例如 2026-06-10 15:16，默认 CST）: ").strip()
     if not recovery_text:
         print("未输入额度恢复时间，已取消校准")
         return 1

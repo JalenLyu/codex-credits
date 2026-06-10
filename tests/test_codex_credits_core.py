@@ -6,6 +6,7 @@ from contextlib import redirect_stdout
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts import codex_credits_core as core
 
@@ -336,13 +337,35 @@ class CodexCreditsCoreTest(unittest.TestCase):
                 os.environ.update(old_env)
 
             menu = output.getvalue()
-            self.assertIn("达到限额后使用", menu)
-            self.assertIn("恢复时间往前 7 天", menu)
+            self.assertIn("概览 | color=#6B7280", menu)
+            self.assertIn("用量 | color=#6B7280", menu)
+            self.assertIn("计费周期 | color=#6B7280", menu)
+            self.assertIn("校准 | color=#6B7280", menu)
             self.assertIn("限额后时间窗口和额度校准", menu)
+            self.assertLess(menu.index("🔄 刷新"), menu.index("用量 |"))
             self.assertIn("计费事件", menu)
             self.assertNotIn("次调用", menu)
+            self.assertNotIn("周限额校准", menu)
+            self.assertNotIn("恢复时间反推窗口和单价", menu)
+            self.assertNotIn("当前 周三", menu)
+            self.assertNotIn("权重 output=", menu)
+            self.assertNotIn("Overview |", menu)
+            self.assertNotIn("Usage |", menu)
+            self.assertNotIn("Billing Window |", menu)
+            self.assertNotIn("Calibration |", menu)
             self.assertNotIn("仅校准起点", menu)
             self.assertNotIn("仅校准单价", menu)
+
+    def test_calibrate_command_explains_limit_recovery_flow_in_terminal(self):
+        output = StringIO()
+        with patch("builtins.input", return_value="n"), redirect_stdout(output):
+            core.cmd_calibrate(None)
+
+        text = output.getvalue()
+        self.assertIn("Codex 显示达到周限额时使用", text)
+        self.assertIn("填入 Codex 显示的限额恢复时间", text)
+        self.assertIn("自动往前反推 7 天", text)
+        self.assertIn("校准 token 单价", text)
 
     def test_weekly_report_labels_events_as_billing_events(self):
         report = {
