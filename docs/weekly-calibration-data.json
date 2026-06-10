@@ -1,0 +1,73 @@
+{
+  "description": "Codex billing calibration data — comparing codex_credits (local session files) vs ccusage (API billing)",
+  "saved_at": "2026-06-10T12:14:42.380783+08:00",
+  "config_snapshot": {
+    "output_token_weight": 5.0,
+    "tokens_per_credit": 3981,
+    "cents_per_credit": 4,
+    "weekly_budget_dollars": 87.0,
+    "reset": "Wednesday 15:16 CST"
+  },
+  "current_week": {
+    "period": "2026-06-03T15:16 -> 2026-06-10T15:16",
+    "codex_credits": {
+      "dollars_used": 81.97,
+      "dollars_limit": 87.0,
+      "credits_pct": 94.2,
+      "billable_units": 8158243,
+      "fresh_input": 6039148,
+      "output": 423819,
+      "cached": 94531072,
+      "events": 806,
+      "models": [
+        "codex-auto-review",
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.5"
+      ]
+    },
+    "ccusage": {
+      "cost": 81.89,
+      "input": 6039148,
+      "output": 423819,
+      "reasoning": 125781,
+      "cache_read": 94531072,
+      "note": "June 4+5+9+10 daily sums. Within-window data only."
+    },
+    "delta": {
+      "dollars": 0.08,
+      "pct": 0.1,
+      "verdict": "✅ 误差 $0.08 (0.1%) — 校准精准"
+    }
+  },
+  "last_week": {
+    "period": "2026-05-27T15:16 -> 2026-06-03T15:16",
+    "codex_credits": {
+      "dollars_used": 97.93,
+      "dollars_limit": 87.0,
+      "credits_pct": 100.0,
+      "billable_units": 9746234,
+      "fresh_input": 8330429,
+      "output": 283161,
+      "cached": 80185472,
+      "events": 623,
+      "models": [
+        "codex-auto-review",
+        "gpt-5.5"
+      ]
+    },
+    "ccusage": {
+      "cost": 44.58,
+      "input": 5088857,
+      "output": 149394,
+      "reasoning": 54160,
+      "cache_read": 47432416,
+      "note": "May 28 ($32.33) + June 2 ($12.25). May 27 ($82.65) straddles boundary — hour-level split unknown. ⚠️ 实际金额可能包含 May 27 下午部分。"
+    },
+    "delta": {
+      "dollars": 53.35,
+      "pct": 119.7,
+      "verdict": "⚠️ 差异 $39.79 (89%) — codex_credits 读数偏高。可能原因: (1) session 文件包含 May 27 下午数据, ccusage 按天整算无法拆分; (2) 上周 session 文件与 API 计费窗口不完全对齐。需进一步按小时拆分验证。"
+    }
+  }
+}
