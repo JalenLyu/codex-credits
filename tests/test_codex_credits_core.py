@@ -339,8 +339,42 @@ class CodexCreditsCoreTest(unittest.TestCase):
             self.assertIn("达到限额后使用", menu)
             self.assertIn("恢复时间往前 7 天", menu)
             self.assertIn("限额后时间窗口和额度校准", menu)
+            self.assertIn("计费事件", menu)
+            self.assertNotIn("次调用", menu)
             self.assertNotIn("仅校准起点", menu)
             self.assertNotIn("仅校准单价", menu)
+
+    def test_weekly_report_labels_events_as_billing_events(self):
+        report = {
+            "period_start": "2026-06-03T15:16:00+08:00",
+            "period_active_end": "2026-06-10T15:16:00+08:00",
+            "daily": [
+                {
+                    "date": "2026-06-10",
+                    "events": 2,
+                    "fresh_input": 100,
+                    "output": 10,
+                    "cached": 0,
+                    "credits": 1.0,
+                    "credits_pct": 0.1,
+                }
+            ],
+            "credits_pct": 0.1,
+            "credits_used": 1.0,
+            "credits_limit": 1875.0,
+            "credits_remaining": 1874.0,
+            "dollars_used": 0.04,
+            "dollars_limit": 75.0,
+            "models": [],
+        }
+
+        output = StringIO()
+        with redirect_stdout(output):
+            core.print_weekly(report)
+
+        weekly = output.getvalue()
+        self.assertIn("计费事件", weekly)
+        self.assertNotIn("日期          事件", weekly)
 
 
 if __name__ == "__main__":

@@ -472,12 +472,12 @@ def print_weekly(report):
     print("Codex Credits - 周明细")
     print(f"  窗口: {report['period_start'][:16]} -> {report['period_active_end'][:10]}")
     print()
-    print(f"{'日期':<12}{'事件':<5}{'新鲜输入':<11}{'输出':<9}{'缓存':<11}{'Credits':<8}{'%':<6}")
+    print(f"{'日期':<12}{'计费事件':<7}{'新鲜输入':<11}{'输出':<9}{'缓存':<11}{'Credits':<8}{'%':<6}")
     print("-" * 62)
     for row in report["daily"]:
         print(
             f"{fmt_date(row['date']):<12}"
-            f"{row['events']:<5}"
+            f"{row['events']:<7}"
             f"{row['fresh_input']:<11,}"
             f"{row['output']:<9,}"
             f"{row['cached']:<11,}"
@@ -497,12 +497,12 @@ def print_daily(report):
     print("Codex Credits - 每日明细")
     print(f"  窗口: {report['period_start'][:16]} -> {report['period_active_end'][:10]}")
     print()
-    print(f"{'日期':<12}{'事件':<5}{'新鲜输入':<11}{'输出':<9}{'缓存':<11}{'Credits':<9}{'累计':<9}")
+    print(f"{'日期':<12}{'计费事件':<7}{'新鲜输入':<11}{'输出':<9}{'缓存':<11}{'Credits':<9}{'累计':<9}")
     print("-" * 66)
     for row in report["daily"]:
         print(
             f"{fmt_date(row['date']):<12}"
-            f"{row['events']:<5}"
+            f"{row['events']:<7}"
             f"{row['fresh_input']:<11,}"
             f"{row['output']:<9,}"
             f"{row['cached']:<11,}"
@@ -601,7 +601,7 @@ def cmd_menu(_args):
     print("---")
     print("Billing Window | color=#6B7280")
     print(f"{report['period_start'][:10]} {report['period_start'][11:16]} -> {report['period_end'][:10]} {report['period_end'][11:16]}")
-    print(f"刷新 {report['updated_at'][11:19]} · {report['events']} 次调用")
+    print(f"刷新 {report['updated_at'][11:19]} · {report['events']} 个计费事件")
     print("---")
     print("Calibration | color=#6B7280")
     print(f"起点 {report['reset_weekday']} {report['reset_hour']:02d}:{report['reset_minute']:02d}")
