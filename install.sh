@@ -80,7 +80,7 @@ except (OSError, json.JSONDecodeError):
     config = {}
 
 defaults = {
-    "weekly_budget_dollars": 0,
+    "weekly_budget_dollars": 75,
     "weekly_credits": 1875,
     "tokens_per_credit": 3981,
     "cents_per_credit": 4,

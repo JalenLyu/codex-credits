@@ -46,9 +46,7 @@ bash scripts/codex-menu-bar.sh   # 手动预览 SwiftBar 输出
 codex                    # 本周花费
 codex --weekly           # 逐日明细
 codex --auto-detect      # 探测计费起点
-codex --calibrate-start  # 校准首次使用/重置时间
-codex --calibrate-rate   # 校准 token 单价
-codex --calibrate        # 完整交互式校准
+codex --calibrate        # 限额后时间窗口和额度校准（推荐）
 codex --set-budget 87    # 设置周预算
 codex --status           # 单行，适合 PS1
 ```
@@ -72,7 +70,7 @@ dollars = billable_units × 估值费率
 
 ```json
 {
-  "weekly_budget_dollars": 0,
+  "weekly_budget_dollars": 75,
   "weekly_credits": 1875,
   "tokens_per_credit": 3981,
   "cents_per_credit": 4,
@@ -87,20 +85,19 @@ dollars = billable_units × 估值费率
 ## 给 Coding Agent
 
 ```bash
-# 校准首次使用/重置时间
-codex --calibrate-start
+# 推荐：达到周限额后时间窗口和额度校准
+codex --calibrate
+# 按提示输入 Codex 展示的额度恢复时间，例如 2026-06-10 15:16
+# 脚本会用恢复时间往前 7 天作为完整窗口，反推 tokens_per_credit
 
-# 校准单价（例如当前窗口实际消耗 $75）
-codex --calibrate-rate 75
-
-# 设预算（用于自定义百分比阈值）
+# 设置周预算（用于自定义百分比阈值）
 codex --set-budget 87
 ```
 
 ## 局限性
 
 - **企业定价不透明**：基于 `$75 ≈ 1,875 credits` 反推，不是 API 公开价
-- **无法识别额度变更**：申请更高额度后需手动改 `weekly_budget_dollars`
+- **无法识别额度变更**：申请更高额度后需运行 `codex --set-budget <金额>` 调整周预算
 - **本地余额为 null**：企业版不暴露，只能推算已用量
 - **需一周校准**：跑满一周后用实际限额修正汇率
 

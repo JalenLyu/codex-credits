@@ -156,8 +156,10 @@ SwiftBar 通过 `codex.10s.sh` 插件轮询 `/tmp/codex-credits.json`。
 ├ Billing Window
 ├ 2026-06-03 15:16 → 2026-06-10 15:16
 ├ Calibration
-├ 校准起点 / 校准单价 / 完整校准
-├ 🔄 刷新数据  | 📋 周明细  | 💵 设置预算
+├ 达到限额后使用
+├ 输入恢复时间，自动用恢复时间往前 7 天校准
+├ ⚙️ 限额后时间窗口和额度校准
+├ 🔄 刷新数据  | 📋 周明细  | 💵 设置周预算
 ```
 
 #### 终端（daily-usage.sh）
@@ -171,10 +173,11 @@ SwiftBar 通过 `codex.10s.sh` 插件轮询 `/tmp/codex-credits.json`。
 | `--weekly` | 本周逐日明细 |
 | `--daily` | 每日明细 |
 | `--watch` | 监控模式（5 分钟刷新） |
+| `--calibrate` | 推荐入口：限额后时间窗口和额度校准 |
+| `--calibrate-limit` / `--calibrate-window` | `--calibrate` 的明确别名 |
 | `--set-reset` | 兼容旧命令，等同于 `--calibrate-start` |
-| `--calibrate-start` | 校准首次使用/重置时间 |
-| `--calibrate-rate` | 校准 token 单价 |
-| `--calibrate` | 完整交互式校准 |
+| `--calibrate-start` | 高级入口：仅校准首次使用/重置时间 |
+| `--calibrate-rate` | 高级入口：仅校准 token 单价 |
 | `--set-budget` | 设置周预算 |
 | `--version` | 版本信息 |
 
@@ -231,8 +234,8 @@ if now_cst < period_start:
 ### 首次安装
 
 ```bash
-# 1. 配重置时间
-bash ./scripts/daily-usage.sh --calibrate-start
+# 1. 安装脚本会自动探测首次使用/重置时间
+bash install.sh
 
 # 2. 安装菜单栏（可选）
 brew install --cask swiftbar
@@ -246,10 +249,11 @@ bash ./scripts/codex-credits-cache.sh
 
 ### 校准
 
-等一周限额用满后，对比 `credits_used` 和实际值，通过校准命令更新 `~/.codex-credits.json`：
+默认周预算为 `$75`。等一周限额用满后，用 Codex 提示的额度恢复时间校准窗口和单价：
 
 ```json
 {
+  "weekly_budget_dollars": 75,
   "tokens_per_credit": 3981,     // 调大 = token 更便宜
   "output_token_weight": 0,      // 0 = 输出不计费
   "cached_token_weight": 0,      // 0 = 缓存不计费
@@ -278,33 +282,32 @@ bash ./scripts/codex-credits-cache.sh
 
 正常使用 Codex，直到收到弹幕 `🔴 额度即将用尽` 或 Codex 提示配额不足。
 
-#### 第 2 步：记录数据
+#### 第 2 步：运行推荐校准
 
 ```bash
-bash ./scripts/daily-usage.sh --weekly
+bash ./scripts/daily-usage.sh --calibrate
 ```
 
-重点关注输出末尾的总计数字：
+按提示输入：
 
 ```
-已用: 1842.0 / 1875 credits  ← 这里应该接近 1875
+当前是否已经达到周限额？y
+额度恢复时间: 2026-06-10 15:16
+周限额金额: 75
 ```
 
-#### 第 3 步：校准单价
-
-假设当前窗口实际消耗 `$75`，直接执行：
-
-```bash
-bash ./scripts/daily-usage.sh --calibrate-rate 75
-```
-
-脚本会使用当前窗口的 `billable_units` 反推新的 `tokens_per_credit`：
+脚本会使用“额度恢复时间往前 7 天”作为完整用量窗口，反推新的 `tokens_per_credit`：
 
 ```python
 tokens_per_credit = billable_units / (actual_dollars / (cents_per_credit / 100))
 ```
 
-#### 第 4 步：验证
+同时会保存：
+- 周预算金额
+- 每周重置时间
+- 新的 token 单价
+
+#### 第 3 步：验证
 
 ```bash
 # 刷新缓存

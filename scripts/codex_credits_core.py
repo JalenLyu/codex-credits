@@ -25,7 +25,7 @@ class Config:
     reset_weekday: str = "Wednesday"
     reset_hour: int = 15
     reset_minute: int = 16
-    weekly_budget_dollars: float = 0
+    weekly_budget_dollars: float = 75
     detected_from: Optional[str] = None
 
 
@@ -59,7 +59,7 @@ def load_config(config_path=None):
         reset_weekday=raw.get("reset_weekday") or "Wednesday",
         reset_hour=_as_int(raw.get("reset_hour"), 15),
         reset_minute=_as_int(raw.get("reset_minute"), 16),
-        weekly_budget_dollars=_as_float(raw.get("weekly_budget_dollars"), 0),
+        weekly_budget_dollars=_as_float(raw.get("weekly_budget_dollars"), 75),
         detected_from=raw.get("detected_from"),
     )
 
@@ -174,29 +174,17 @@ def _round_one(value):
     return round(float(value) + 0, 1)
 
 
-def build_report(session_dir, archive_dir, cfg, now=None):
-    now_cst = (now or datetime.now(CST)).astimezone(CST)
-    period_start = get_period_start(now_cst, cfg)
-    period_end = period_start + timedelta(days=7)
-    active_end = min(now_cst, period_end)
-
+def aggregate_window(session_dir, archive_dir, cfg, window_start, window_end):
     events = [
         event
         for event in iter_token_events(session_dir, archive_dir)
-        if period_start <= event["timestamp"] <= active_end
+        if window_start <= event["timestamp"] < window_end
     ]
 
     fresh_total = sum(event["fresh_input"] for event in events)
     output_total = sum(event["output"] for event in events)
     cached_total = sum(event["cached"] for event in events)
     units = billable_units(fresh_total, output_total, cached_total, cfg)
-
-    credits_used_raw = units / cfg.tokens_per_credit if cfg.tokens_per_credit > 0 else 0
-    dollars_used_raw = credits_used_raw * cfg.cents_per_credit / 100
-    default_dollars_limit = cfg.weekly_credits * cfg.cents_per_credit / 100
-    dollars_limit = cfg.weekly_budget_dollars if cfg.weekly_budget_dollars > 0 else default_dollars_limit
-    credits_limit = dollars_limit / (cfg.cents_per_credit / 100) if cfg.cents_per_credit > 0 else cfg.weekly_credits
-    credits_pct = min(100.0, credits_used_raw / credits_limit * 100) if credits_limit > 0 else 0
 
     model_totals = defaultdict(lambda: {"fresh_input": 0, "output": 0, "cached": 0, "events": 0})
     daily_totals = defaultdict(lambda: {"fresh_input": 0, "output": 0, "cached": 0, "events": 0, "models": set()})
@@ -214,6 +202,40 @@ def build_report(session_dir, archive_dir, cfg, now=None):
         daily_totals[day_key]["cached"] += event["cached"]
         daily_totals[day_key]["events"] += 1
         daily_totals[day_key]["models"].add(model)
+
+    return {
+        "events": events,
+        "fresh_input": fresh_total,
+        "output": output_total,
+        "cached": cached_total,
+        "billable_units": units,
+        "model_totals": model_totals,
+        "daily_totals": daily_totals,
+    }
+
+
+def build_report(session_dir, archive_dir, cfg, now=None):
+    now_cst = (now or datetime.now(CST)).astimezone(CST)
+    period_start = get_period_start(now_cst, cfg)
+    period_end = period_start + timedelta(days=7)
+    active_end = min(now_cst, period_end)
+
+    aggregate = aggregate_window(session_dir, archive_dir, cfg, period_start, active_end + timedelta(microseconds=1))
+    events = aggregate["events"]
+    fresh_total = aggregate["fresh_input"]
+    output_total = aggregate["output"]
+    cached_total = aggregate["cached"]
+    units = aggregate["billable_units"]
+
+    credits_used_raw = units / cfg.tokens_per_credit if cfg.tokens_per_credit > 0 else 0
+    dollars_used_raw = credits_used_raw * cfg.cents_per_credit / 100
+    default_dollars_limit = cfg.weekly_credits * cfg.cents_per_credit / 100
+    dollars_limit = cfg.weekly_budget_dollars if cfg.weekly_budget_dollars > 0 else default_dollars_limit
+    credits_limit = dollars_limit / (cfg.cents_per_credit / 100) if cfg.cents_per_credit > 0 else cfg.weekly_credits
+    credits_pct = min(100.0, credits_used_raw / credits_limit * 100) if credits_limit > 0 else 0
+
+    model_totals = aggregate["model_totals"]
+    daily_totals = aggregate["daily_totals"]
 
     model_detail = {}
     for model, values in sorted(model_totals.items()):
@@ -316,6 +338,63 @@ def calibrate_rate(cfg, billable_units, actual_dollars):
         "reset_minute": cfg.reset_minute,
         "detected_from": cfg.detected_from,
     }
+
+
+def calibrate_from_limit_recovery(session_dir, archive_dir, cfg, recovery_time, limit_dollars):
+    recovery = recovery_time.astimezone(CST)
+    window_start = recovery - timedelta(days=7)
+    aggregate = aggregate_window(session_dir, archive_dir, cfg, window_start, recovery)
+    updated = calibrate_rate(cfg, aggregate["billable_units"], limit_dollars)
+    updated["weekly_budget_dollars"] = limit_dollars
+    updated["reset_weekday"] = recovery.strftime("%A")
+    updated["reset_hour"] = recovery.hour
+    updated["reset_minute"] = recovery.minute
+    updated["detected_from"] = window_start.isoformat()
+    return {
+        **updated,
+        "window_start": window_start.isoformat(),
+        "window_end": recovery.isoformat(),
+        "billable_units": aggregate["billable_units"],
+        "fresh_input": aggregate["fresh_input"],
+        "output": aggregate["output"],
+        "cached": aggregate["cached"],
+        "events": len(aggregate["events"]),
+    }
+
+
+def run_limit_window_calibration(recovery_time, limit_dollars):
+    paths = default_paths()
+    cfg = load_config(paths["config_file"])
+    result = calibrate_from_limit_recovery(
+        paths["session_dir"],
+        paths["archive_dir"],
+        cfg,
+        recovery_time,
+        limit_dollars,
+    )
+    raw = read_config_dict(paths["config_file"])
+    raw.update(
+        {
+            "weekly_budget_dollars": result["weekly_budget_dollars"],
+            "weekly_credits": result["weekly_credits"],
+            "tokens_per_credit": result["tokens_per_credit"],
+            "cents_per_credit": result["cents_per_credit"],
+            "output_token_weight": result["output_token_weight"],
+            "cached_token_weight": result["cached_token_weight"],
+            "reset_weekday": result["reset_weekday"],
+            "reset_hour": result["reset_hour"],
+            "reset_minute": result["reset_minute"],
+            "detected_from": result["detected_from"],
+            "calibrated_from_limit_window": {
+                "window_start": result["window_start"],
+                "window_end": result["window_end"],
+                "limit_dollars": limit_dollars,
+                "billable_units": result["billable_units"],
+            },
+        }
+    )
+    write_config_dict(raw, paths["config_file"])
+    return result
 
 
 def format_token_count(value):
@@ -528,13 +607,13 @@ def cmd_menu(_args):
     print(f"起点 {report['reset_weekday']} {report['reset_hour']:02d}:{report['reset_minute']:02d}")
     print(f"单价 {report['tokens_per_credit']:,} units/credit")
     print(f"权重 output={report['output_token_weight']:g} cached={report['cached_token_weight']:g}")
-    print(f"🧭 校准起点 | bash={main_script} param1=--calibrate-start terminal=true")
-    print(f"💱 校准单价 | bash={main_script} param1=--calibrate-rate terminal=true")
-    print(f"⚙️ 完整校准 | bash={main_script} param1=--calibrate terminal=true")
+    print("达到限额后使用")
+    print("输入恢复时间，自动用恢复时间往前 7 天校准")
+    print(f"⚙️ 限额后时间窗口和额度校准 | bash={main_script} param1=--calibrate terminal=true")
     print("---")
     print(f"🔄 刷新数据 | bash={cache_script} terminal=false refresh=true")
     print(f"📋 周明细 | bash={main_script} param1=--weekly terminal=true")
-    print(f"💵 设置预算 | bash={main_script} param1=--set-budget terminal=true")
+    print(f"💵 设置周预算 | bash={main_script} param1=--set-budget terminal=true")
     return 0
 
 
@@ -549,7 +628,7 @@ def apply_start_calibration(config_path, first_usage):
     raw.setdefault("cents_per_credit", 4)
     raw.setdefault("output_token_weight", 0)
     raw.setdefault("cached_token_weight", 0)
-    raw.setdefault("weekly_budget_dollars", 0)
+    raw.setdefault("weekly_budget_dollars", 75)
     write_config_dict(raw, config_path)
     return raw
 
@@ -638,33 +717,36 @@ def cmd_set_budget(args):
 
 def cmd_calibrate(_args):
     paths = default_paths()
-    print("Codex Credits 校准")
-    print()
-
-    first = detect_first_usage(paths["session_dir"], paths["archive_dir"], after=DEFAULT_BILLING_START)
-    if first:
-        answer = input(f"使用首条消费作为起点？{first.strftime('%Y-%m-%d %A %H:%M')} CST [Y/n]: ").strip().lower()
-        if answer in ("", "y", "yes"):
-            apply_start_calibration(paths["config_file"], first)
-            print("  起点已保存")
-
     cfg = load_config(paths["config_file"])
-    budget_default = cfg.weekly_budget_dollars if cfg.weekly_budget_dollars > 0 else cfg.weekly_credits * cfg.cents_per_credit / 100
-    budget = input(f"周预算金额（默认 ${budget_default:.2f}，回车保留）: ").strip()
-    if budget:
-        cmd_set_budget(argparse.Namespace(amount=float(budget)))
+    print("Codex Credits 限额后时间窗口和额度校准")
+    print()
+    print("用于在达到周限额后校准：输入 Codex 提示的额度恢复时间，脚本会用恢复时间往前 7 天作为完整窗口。")
+    print()
 
-    report, cfg, _paths = build_default_report()
-    actual = input("当前窗口实际消耗金额（回车跳过单价校准）: ").strip()
-    if actual:
-        updated = calibrate_rate(cfg, report["billable_units"], float(actual))
-        raw = read_config_dict(paths["config_file"])
-        raw.update(updated)
-        write_config_dict(raw, paths["config_file"])
-        print(f"  单价已保存: {updated['tokens_per_credit']:,} units/credit")
+    reached = input("当前是否已经达到周限额？[y/N]: ").strip().lower()
+    if reached not in ("y", "yes"):
+        print("未达到周限额时不建议校准单价。可以先使用 codex --calibrate-start 校准首次使用/重置时间。")
+        return 0
+
+    recovery_text = input("额度恢复时间（例如 2026-06-10 15:16，默认 CST）: ").strip()
+    if not recovery_text:
+        print("未输入额度恢复时间，已取消校准")
+        return 1
+
+    limit_default = cfg.weekly_budget_dollars if cfg.weekly_budget_dollars > 0 else 75
+    limit_text = input(f"周限额金额（默认 ${limit_default:.2f}）: ").strip()
+    limit_dollars = float(limit_text) if limit_text else limit_default
+
+    result = run_limit_window_calibration(parse_local_datetime(recovery_text), limit_dollars)
 
     print()
-    print(f"✅ 校准完成: {paths['config_file']}")
+    print("✅ 限额后时间窗口和额度校准完成")
+    print(f"  窗口: {result['window_start'][:16]} -> {result['window_end'][:16]}")
+    print(f"  Billable: {result['billable_units']:,} units")
+    print(f"  周限额: ${limit_dollars:.2f}")
+    print(f"  新单价: {result['tokens_per_credit']:,} units/credit")
+    print(f"  重置时间: {result['reset_weekday']} {result['reset_hour']:02d}:{result['reset_minute']:02d} CST")
+    print(f"  Saved to {paths['config_file']}")
     return 0
 
 
@@ -719,7 +801,7 @@ def main(argv=None):
         if command == "--calibrate-rate":
             actual = float(argv[1]) if len(argv) > 1 else None
             return cmd_calibrate_rate(argparse.Namespace(actual_dollars=actual))
-        if command == "--calibrate":
+        if command in ("--calibrate", "--calibrate-limit", "--calibrate-window"):
             return cmd_calibrate(argparse.Namespace())
         return cmd_report(argparse.Namespace(command=command))
 

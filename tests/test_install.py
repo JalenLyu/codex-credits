@@ -56,6 +56,8 @@ class InstallTest(unittest.TestCase):
             self.assertTrue((home / ".codex" / "hooks.json").is_file())
             self.assertTrue((home / ".zshrc").is_file())
             self.assertTrue((home / "Library" / "SwiftBar" / "plugins" / "codex.10s.sh").is_symlink())
+            config = json.loads((home / ".codex-credits.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["weekly_budget_dollars"], 75)
             self.assertIn("alias codex=", (home / ".zshrc").read_text(encoding="utf-8"))
             self.assertIn("PostToolUse", (home / ".codex" / "hooks.json").read_text(encoding="utf-8"))
             self.assertIn("菜单栏显示", result.stdout)
