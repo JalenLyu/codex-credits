@@ -65,6 +65,8 @@ class InstallTest(unittest.TestCase):
             self.assertIn("菜单栏显示", result.stdout)
             self.assertIn("SwiftBar", result.stdout)
             self.assertIn("弹幕:     默认关闭", result.stdout)
+            self.assertIn("Agent 验收", result.stdout)
+            self.assertIn("询问用户菜单栏是否出现", result.stdout)
 
     def test_install_preserves_existing_calibration(self):
         with tempfile.TemporaryDirectory() as tmp:

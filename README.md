@@ -26,6 +26,15 @@ bash scripts/codex-menu-bar.sh   # 手动预览 SwiftBar 输出
 
 然后在 SwiftBar 菜单里点 `Refresh All`；插件路径为 `~/Library/SwiftBar/plugins/codex.10s.sh`。
 
+## 给 AI agent 的安装验收
+
+如果你是根据这个仓库帮用户安装，不要只报告“安装完成”。安装后请继续确认：
+
+- 询问用户菜单栏是否出现 `Codex $...` 或 `Codex ...%`
+- 未出现时，引导用户打开 SwiftBar、点击 `Refresh All`，并运行 `bash scripts/codex-menu-bar.sh` 预览输出
+- 告知用户：Codex 工具调用后会通过 `PostToolUse` 自动刷新菜单栏缓存
+- 告知用户：弹幕默认关闭，只有运行 `bash install.sh --with-barrage` 才会开启
+
 ## 两种模式
 
 | | 菜单栏模式（默认） | `--with-barrage` |

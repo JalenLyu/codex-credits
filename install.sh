@@ -205,5 +205,12 @@ else
     echo "  弹幕:     默认关闭（需要时运行 bash install.sh --with-barrage）"
 fi
 echo ""
-echo "  重新安装:  bash install.sh --with-barrage"
+echo "  Agent 验收:"
+echo "    1. 询问用户菜单栏是否出现 Codex 金额或百分比"
+echo "    2. 未出现时，先 open -a SwiftBar，再点 SwiftBar 菜单的 Refresh All"
+echo "    3. 用 bash $PROJ_DIR/scripts/codex-menu-bar.sh 预览输出"
+echo "    4. 告知用户：Codex 工具调用后会自动刷新菜单栏缓存"
+echo ""
+echo "  开启弹幕:  bash install.sh --with-barrage"
+echo "  关闭弹幕:  bash install.sh"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
