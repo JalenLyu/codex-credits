@@ -13,6 +13,16 @@ bash install.sh --with-barrage     # 菜单栏 + 终端 + 弹幕通知
 
 菜单栏自动配置（`defaults write` 预设插件目录），装了 SwiftBar 就出现。
 
+如果菜单栏没有显示：
+
+```bash
+brew install --cask swiftbar
+open -a SwiftBar
+bash scripts/codex-menu-bar.sh   # 手动预览 SwiftBar 输出
+```
+
+然后在 SwiftBar 菜单里点 `Refresh All`；插件路径为 `~/Library/SwiftBar/plugins/codex.10s.sh`。
+
 ## 两种模式
 
 | | 菜单栏模式（默认） | `--with-barrage` |
@@ -20,7 +30,8 @@ bash install.sh --with-barrage     # 菜单栏 + 终端 + 弹幕通知
 | `codex` 命令 | ✅ | ✅ |
 | 菜单栏 `Codex $8` | ✅ | ✅ |
 | 弹幕通知 | ❌ | ✅ |
-| 钩子（PostToolUse） | ❌ | ✅ |
+| 缓存刷新钩子（PostToolUse） | ✅ | ✅ |
+| 弹幕钩子（Stop） | ❌ | ✅ |
 | 适用场景 | 日常够用 | 需要每次提醒 |
 
 菜单栏和弹幕使用统一设计：**美元金额 + 相同配色**。
@@ -35,6 +46,10 @@ bash install.sh --with-barrage     # 菜单栏 + 终端 + 弹幕通知
 codex                    # 本周花费
 codex --weekly           # 逐日明细
 codex --auto-detect      # 探测计费起点
+codex --calibrate-start  # 校准首次使用/重置时间
+codex --calibrate-rate   # 校准 token 单价
+codex --calibrate        # 完整交互式校准
+codex --set-budget 87    # 设置周预算
 codex --status           # 单行，适合 PS1
 ```
 
@@ -58,7 +73,11 @@ dollars = billable_units × 估值费率
 ```json
 {
   "weekly_budget_dollars": 0,
+  "weekly_credits": 1875,
   "tokens_per_credit": 3981,
+  "cents_per_credit": 4,
+  "output_token_weight": 0,
+  "cached_token_weight": 0,
   "reset_weekday": "Wednesday",
   "reset_hour": 15,
   "reset_minute": 16
@@ -68,11 +87,14 @@ dollars = billable_units × 估值费率
 ## 给 Coding Agent
 
 ```bash
-# 校准汇率（满一周后）
-codex --weekly  # 看实际消耗，调 tokens_per_credit
+# 校准首次使用/重置时间
+codex --calibrate-start
 
-# 设预算（才知道百分比）
-code ~/.codex-credits.json  # weekly_budget_dollars
+# 校准单价（例如当前窗口实际消耗 $75）
+codex --calibrate-rate 75
+
+# 设预算（用于自定义百分比阈值）
+codex --set-budget 87
 ```
 
 ## 局限性

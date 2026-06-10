@@ -64,19 +64,39 @@ else:
 
 [ "${FOUND:-0}" = "1" ] && echo -e "${GREEN}✅ $FIRST_DATE $RESET_WEEKDAY ${RESET_HOUR}:${RESET_MINUTE} CST${RESET}" || echo -e "${YELLOW}⚠️  使用默认${RESET}"
 
-# ── 配置 ──
-cat > "$HOME/.codex-credits.json" << EOF
-{
-  "weekly_budget_dollars": 0,
-  "tokens_per_credit": 3900,
-  "cents_per_credit": 4,
-  "output_token_weight": 1,
-  "cached_token_weight": 0,
-  "reset_weekday": "$RESET_WEEKDAY",
-  "reset_hour": $RESET_HOUR,
-  "reset_minute": $RESET_MINUTE
+# ── 配置：只补缺省值，不覆盖用户已有校准 ──
+export RESET_WEEKDAY RESET_HOUR RESET_MINUTE
+python3 - <<'PYEOF'
+import json
+import os
+from pathlib import Path
+
+path = Path.home() / ".codex-credits.json"
+try:
+    config = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(config, dict):
+        config = {}
+except (OSError, json.JSONDecodeError):
+    config = {}
+
+defaults = {
+    "weekly_budget_dollars": 0,
+    "weekly_credits": 1875,
+    "tokens_per_credit": 3981,
+    "cents_per_credit": 4,
+    "output_token_weight": 0,
+    "cached_token_weight": 0,
+    "reset_weekday": os.environ.get("RESET_WEEKDAY", "Wednesday"),
+    "reset_hour": int(os.environ.get("RESET_HOUR", "15")),
+    "reset_minute": int(os.environ.get("RESET_MINUTE", "16")),
 }
-EOF
+
+for key, value in defaults.items():
+    config.setdefault(key, value)
+
+path.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+PYEOF
+echo -e "${GREEN}✅ 配置已初始化/保留${RESET}"
 
 # ── 终端别名 ──
 ALIAS_LINE="alias codex='bash $PROJ_DIR/scripts/daily-usage.sh'"
@@ -104,34 +124,50 @@ else
     echo "   brew install --cask swiftbar && open -a SwiftBar"
 fi
 
+# ── Codex 钩子：默认刷新缓存，弹幕可选 ──
+HOOKS_FILE="$HOME/.codex/hooks.json"
+export HOOKS_FILE PROJ_DIR MODE
+python3 - <<'PYEOF'
+import json
+import os
+from pathlib import Path
+
+hooks_file = Path(os.environ["HOOKS_FILE"])
+proj_dir = os.environ["PROJ_DIR"]
+mode = os.environ["MODE"]
+hooks_file.parent.mkdir(parents=True, exist_ok=True)
+
+try:
+    config = json.loads(hooks_file.read_text(encoding="utf-8"))
+    if not isinstance(config, dict):
+        config = {"hooks": {}}
+except (OSError, json.JSONDecodeError):
+    config = {"hooks": {}}
+
+hooks = config.setdefault("hooks", {})
+
+post_tool_use = hooks.setdefault("PostToolUse", [])
+cache_command = f"/bin/bash {proj_dir}/scripts/codex-credits-cache.sh"
+if not any("codex-credits-cache.sh" in json.dumps(item) for item in post_tool_use):
+    post_tool_use.append({"hooks": [{"command": cache_command, "timeout": 30, "type": "command"}]})
+    print("PostToolUse 缓存钩子已添加")
+
+if mode == "--with-barrage":
+    stop_hooks = hooks.setdefault("Stop", [])
+    barrage_command = f"/bin/bash {proj_dir}/scripts/codex-barrage.sh"
+    if not any("codex-barrage.sh" in json.dumps(item) for item in stop_hooks):
+        stop_hooks.append({"hooks": [{"command": barrage_command, "timeout": 10, "type": "command"}]})
+        print("Stop 弹幕钩子已添加")
+
+hooks_file.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+PYEOF
+echo -e "${GREEN}✅ 缓存刷新钩子已安装${RESET}"
+
 # ── 弹幕（可选） ──
 case "$MODE" in
     --with-barrage)
         echo ""
         echo -e "${CYAN}📢 弹幕模式${RESET}"
-
-        HOOKS_FILE="$HOME/.codex/hooks.json"
-        python3 -c "
-import json
-try:
-    with open('$HOOKS_FILE') as f: config = json.load(f)
-except: config = {'hooks': {}}
-h = config.setdefault('hooks', {})
-
-# PostToolUse: 刷新缓存（菜单栏和弹幕共用）
-pt = h.setdefault('PostToolUse', [])
-if not any('codex-credits-cache.sh' in json.dumps(x) for x in pt):
-    pt.append({'hooks': [{'command': '/bin/bash $PROJ_DIR/scripts/codex-credits-cache.sh', 'timeout': 30, 'type': 'command'}]})
-    print('PostToolUse 钩子已添加')
-
-# Stop: 弹幕通知
-st = h.setdefault('Stop', [])
-if not any('codex-barrage.sh' in json.dumps(x) for x in st):
-    st.append({'hooks': [{'command': '/bin/bash $PROJ_DIR/scripts/codex-barrage.sh', 'timeout': 10, 'type': 'command'}]})
-    print('Stop 弹幕钩子已添加')
-
-with open('$HOOKS_FILE', 'w') as f: json.dump(config, f, indent=2)
-" 2>/dev/null
         echo -e "${GREEN}✅ 弹幕钩子已安装${RESET}"
         echo "   每次 Codex 会话结束自动弹出"
         ;;
@@ -145,7 +181,12 @@ echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${GREEN}${BOLD} ✅ 完成${RESET}"
 echo ""
 echo "  终端:     source ~/.zshrc && codex"
-echo "  菜单栏:   brew install --cask swiftbar (自动配置)"
+echo "  菜单栏显示:"
+echo "    1. 未安装 SwiftBar: brew install --cask swiftbar && open -a SwiftBar"
+echo "    2. 已安装 SwiftBar: 打开 SwiftBar 后会自动读取插件目录"
+echo "    3. 没出现时: SwiftBar 菜单中点 Refresh All，或确认插件路径:"
+echo "       $PLUGIN_DIR/codex.10s.sh"
+echo "    4. 手动预览: bash $PROJ_DIR/scripts/codex-menu-bar.sh"
 if [ "$MODE" = "--with-barrage" ]; then
     echo "  弹幕:     会话结束自动弹出"
 fi

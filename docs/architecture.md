@@ -13,8 +13,8 @@
 ┌────────────────────────────────────────────────────────────┐
 │  触发层（Codex 钩子）                                        │
 │  ~/.codex/hooks.json                                       │
-│  ├─ PostToolUse → codex-credits-cache.sh  ← 每次工具调用后   │
-│  └─ Stop       → codex-barrage.sh          ← 会话结束后弹幕   │
+│  ├─ PostToolUse → codex-credits-cache.sh  ← 默认安装         │
+│  └─ Stop       → codex-barrage.sh          ← 弹幕模式可选     │
 └──────────────┬─────────────────────────────────────────────┘
                │ 更新
                ▼
@@ -43,8 +43,9 @@
 
 | 文件 | 作用 | 触发方式 |
 |------|------|---------|
-| `scripts/daily-usage.sh` | 主查询脚本（终端使用） | 手动运行 |
-| `scripts/codex-credits-cache.sh` | 更新 /tmp/codex-credits.json 缓存 | PostToolUse 钩子 |
+| `scripts/codex_credits_core.py` | 统一计算、报表、缓存、校准逻辑 | 被各入口调用 |
+| `scripts/daily-usage.sh` | 主查询脚本 wrapper | 手动运行 |
+| `scripts/codex-credits-cache.sh` | 更新 /tmp/codex-credits.json 缓存 wrapper | PostToolUse 钩子 |
 | `scripts/codex-barrage.sh` | 右上角弹幕通知 | Stop 钩子 |
 | `scripts/codex-menu-bar.sh` | SwiftBar 菜单栏插件 | SwiftBar 定时轮询 |
 
@@ -98,19 +99,16 @@ ccusage 使用 LiteLLM 公开 API 价格（如 gpt-5.4 输入 $2.5/M），企业
 
 ### 1. 触发：Codex 钩子
 
-`~/.codex/hooks.json` 中有三个事件被监听：
+`~/.codex/hooks.json` 中 Codex Credits 相关事件：
 
 ```
-PreToolUse    → skynet MCP 权限检查
 PostToolUse   → codex-credits-cache.sh   ← credits 实时更新
-SessionStart  → OpenIslandHooks           ← Open Island 状态同步
-UserPromptSubmit → OpenIslandHooks + skynet
-Stop          → OpenIslandHooks + codex-barrage.sh  ← 弹幕通知
+Stop          → codex-barrage.sh          ← 弹幕模式可选
 ```
 
 #### PostToolUse 钩子
 
-每次 Codex 工具调用后立即触发，执行 `codex-credits-cache.sh`。
+默认安装。每次 Codex 工具调用后立即触发，执行 `codex-credits-cache.sh`。
 
 流程：
 ```
@@ -125,11 +123,11 @@ Stop          → OpenIslandHooks + codex-barrage.sh  ← 弹幕通知
 9. 写入 /tmp/codex-credits.json
 ```
 
-锁机制（`/tmp/codex-credits.lock`）：1 秒内重复触发跳过，避免并发扫描。
+锁机制（`/tmp/codex-credits.lock`）：1 分钟内重复触发跳过，避免并发扫描。
 
 #### Stop 钩子
 
-Codex 会话结束后触发，执行 `codex-barrage.sh`。
+仅 `--with-barrage` 安装。Codex 会话结束后触发，执行 `codex-barrage.sh`。
 
 流程：
 ```
@@ -144,19 +142,22 @@ Codex 会话结束后触发，执行 `codex-barrage.sh`。
 
 #### 菜单栏（SwiftBar）
 
-SwiftBar 通过 `codex.30m.sh` 插件每 30 分钟轮询一次 `/tmp/codex-credits.json`。
+SwiftBar 通过 `codex.10s.sh` 插件轮询 `/tmp/codex-credits.json`。
 实际更新由 PostToolUse 钩子驱动，所以大部分轮询只是读缓存（瞬时完成）。
 
 显示格式：
 ```
-🟢 Cx 7%    ← 菜单栏（颜色 + 百分比）
-├ 💳 Credits
-├ ████░░░░░░░░  123 / 1875
-├ 已用 123 / 1875 cr · 剩余 1752 cr
-├ 📦 Tokens
+🟢 Codex $8 / 7%    ← 菜单栏（金额和百分比交替）
+├ Overview
+├ ████□□□□□□  7.0%
+├ $8.00 / $75.00 · 剩余 $67.00
+├ Usage
 ├ 输入 474K · 输出 4K · 缓存 306K
-├ 📅 2026-06-03 → 2026-06-10
-├ 🔄 立即刷新  | 📋 详细报告  | ⚙️ 校准
+├ Billing Window
+├ 2026-06-03 15:16 → 2026-06-10 15:16
+├ Calibration
+├ 校准起点 / 校准单价 / 完整校准
+├ 🔄 刷新数据  | 📋 周明细  | 💵 设置预算
 ```
 
 #### 终端（daily-usage.sh）
@@ -170,7 +171,11 @@ SwiftBar 通过 `codex.30m.sh` 插件每 30 分钟轮询一次 `/tmp/codex-credi
 | `--weekly` | 本周逐日明细 |
 | `--daily` | 每日明细 |
 | `--watch` | 监控模式（5 分钟刷新） |
-| `--set-reset` | 设置重置时间 |
+| `--set-reset` | 兼容旧命令，等同于 `--calibrate-start` |
+| `--calibrate-start` | 校准首次使用/重置时间 |
+| `--calibrate-rate` | 校准 token 单价 |
+| `--calibrate` | 完整交互式校准 |
+| `--set-budget` | 设置周预算 |
 | `--version` | 版本信息 |
 
 #### 右上角弹幕（codex-barrage.sh）
@@ -217,7 +222,7 @@ if now_cst < period_start:
 |--|----------|--------|
 | 数据源 | rollout JSONL + 其他事件 | rollout JSONL |
 | Model 提取 | response_item / turn_context 多源 | turn_context 为主 |
-| 定价 | LiteLLM 公开价格 | 企业版合约反推 |
+| 定价 | LiteLLM 公开价格 | 企业版合约反推的 billable units/credit |
 | Credits | 不适用 | 企业版 1,875/周 |
 | 显示 | 终端表格 | 菜单栏 + 弹幕 + 终端 |
 
@@ -227,21 +232,21 @@ if now_cst < period_start:
 
 ```bash
 # 1. 配重置时间
-bash ~/"VS Code/Code/open island/scripts/daily-usage.sh" --set-reset
+bash ./scripts/daily-usage.sh --calibrate-start
 
 # 2. 安装菜单栏（可选）
 brew install --cask swiftbar
 mkdir -p ~/Library/SwiftBar/plugins
-ln -s ~/"VS Code/Code/open island/scripts/codex-menu-bar.sh" \
-  ~/Library/SwiftBar/plugins/codex.30m.sh
+ln -s "$PWD/scripts/codex-menu-bar.sh" \
+  ~/Library/SwiftBar/plugins/codex.10s.sh
 
 # 3. 手动刷新缓存
-bash ~/"VS Code/Code/open island/scripts/codex-credits-cache.sh"
+bash ./scripts/codex-credits-cache.sh
 ```
 
 ### 校准
 
-等一周限额用满后，对比 `credits_used` 和实际值，调整 `~/.codex-credits.json`：
+等一周限额用满后，对比 `credits_used` 和实际值，通过校准命令更新 `~/.codex-credits.json`：
 
 ```json
 {
@@ -276,7 +281,7 @@ bash ~/"VS Code/Code/open island/scripts/codex-credits-cache.sh"
 #### 第 2 步：记录数据
 
 ```bash
-bash ~/"VS Code/Code/open island/scripts/daily-usage.sh" --weekly
+bash ./scripts/daily-usage.sh --weekly
 ```
 
 重点关注输出末尾的总计数字：
@@ -285,47 +290,28 @@ bash ~/"VS Code/Code/open island/scripts/daily-usage.sh" --weekly
 已用: 1842.0 / 1875 credits  ← 这里应该接近 1875
 ```
 
-#### 第 3 步：计算修正值
+#### 第 3 步：校准单价
 
-假设用满限额时显示 `credits_used = 1700`，说明实际值偏低——token 比我们想的更值钱。
-
-```python
-# 新的 tokens_per_credit = 实际消耗的 billable_units / 1875
-# 从 --weekly 输出拿到 fresh_input 和 output 的总和
-billable_units = fresh_input_total + output_total * output_weight
-new_rate = billable_units / 1875
-
-# 示例
-# billable_units = 7,800,000  →  new_rate = 7,800,000 / 1,875 = 4,160
-```
-
-#### 第 4 步：更新配置
+假设当前窗口实际消耗 `$75`，直接执行：
 
 ```bash
-code ~/.codex-credits.json
+bash ./scripts/daily-usage.sh --calibrate-rate 75
 ```
 
-```json
-{
-  "tokens_per_credit": 4160,          ← 新汇率
-  "output_token_weight": 1,           ← 如果输出也计费
-  "cached_token_weight": 0,           ← 缓存通常免费
-  "weekly_credits": 1875,
-  "cents_per_credit": 4,
-  "reset_weekday": "Wednesday",
-  "reset_hour": 15,
-  "reset_minute": 16
-}
+脚本会使用当前窗口的 `billable_units` 反推新的 `tokens_per_credit`：
+
+```python
+tokens_per_credit = billable_units / (actual_dollars / (cents_per_credit / 100))
 ```
 
-#### 第 5 步：验证
+#### 第 4 步：验证
 
 ```bash
 # 刷新缓存
-bash ~/"VS Code/Code/open island/scripts/codex-credits-cache.sh"
+bash ./scripts/codex-credits-cache.sh
 
 # 检查
-bash ~/"VS Code/Code/open island/scripts/daily-usage.sh"
+bash ./scripts/daily-usage.sh
 # 应该显示接近 1875 / 1875 credits
 ```
 
