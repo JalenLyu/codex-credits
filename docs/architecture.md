@@ -110,6 +110,7 @@ Stop          → codex-barrage.sh          ← 弹幕模式可选
 
 默认安装。每次 Codex 工具调用后立即触发，执行 `codex-credits-cache.sh`。
 因此正常跑 Codex 后，菜单栏预算会自动跟着更新；SwiftBar 仍按 `codex.10s.sh` 的周期读取最新缓存。
+设置周预算或完成校准时，命令会主动重算并写入同一个缓存文件。
 
 流程：
 ```

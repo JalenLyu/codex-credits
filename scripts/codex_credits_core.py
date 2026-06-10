@@ -545,6 +545,12 @@ def save_cache(report, cache_file):
     Path(cache_file).write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def refresh_menu_cache():
+    report, _cfg, paths = build_default_report()
+    save_cache(report, paths["cache_file"])
+    return paths["cache_file"]
+
+
 def cmd_cache(_args):
     report, _cfg, paths = build_default_report()
     save_cache(report, paths["cache_file"])
@@ -654,6 +660,7 @@ def cmd_calibrate_start(args):
     apply_start_calibration(paths["config_file"], first)
     print(f"✅ 起点已校准: {first.strftime('%Y-%m-%d %A %H:%M')} CST")
     print(f"  Saved to {paths['config_file']}")
+    print(f"  菜单栏缓存已刷新: {refresh_menu_cache()}")
     return 0
 
 
@@ -675,6 +682,7 @@ def cmd_calibrate_rate(args):
     print(f"✅ 单价已校准: {updated['tokens_per_credit']:,} billable units/credit")
     print(f"  基于当前窗口 {report['billable_units']:,} units = ${float(actual):.2f}")
     print(f"  Saved to {paths['config_file']}")
+    print(f"  菜单栏缓存已刷新: {refresh_menu_cache()}")
     return 0
 
 
@@ -707,6 +715,7 @@ def cmd_set_budget(args):
     write_config_dict(raw, paths["config_file"])
     print(f"✅ 周预算 ${float(args.amount):.0f}")
     print("  🟢<40%  🟡<70%  🟠<90%  🔴≥90%")
+    print(f"  菜单栏缓存已刷新: {refresh_menu_cache()}")
     return 0
 
 
@@ -743,6 +752,7 @@ def cmd_calibrate(_args):
     print(f"  新单价: {result['tokens_per_credit']:,} units/credit")
     print(f"  重置时间: {result['reset_weekday']} {result['reset_hour']:02d}:{result['reset_minute']:02d} CST")
     print(f"  Saved to {paths['config_file']}")
+    print(f"  菜单栏缓存已刷新: {refresh_menu_cache()}")
     return 0
 
 

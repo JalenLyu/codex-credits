@@ -295,6 +295,54 @@ class CodexCreditsCoreTest(unittest.TestCase):
             self.assertEqual(report["billable_units"], 1000)
             self.assertEqual(report["dollars_used"], 0.4)
 
+    def test_set_budget_refreshes_menu_cache_immediately(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            sessions = tmp_path / "sessions"
+            archive = tmp_path / "archive"
+            config_file = tmp_path / "config.json"
+            cache_file = tmp_path / "cache.json"
+            write_rollout(
+                sessions,
+                "2026/06/10/rollout-test.jsonl",
+                [token_event("2026-06-10T16:00:00+08:00", 1000)],
+            )
+            config_file.write_text(
+                json.dumps(
+                    {
+                        "tokens_per_credit": 100,
+                        "cents_per_credit": 4,
+                        "reset_weekday": "Wednesday",
+                        "reset_hour": 15,
+                        "reset_minute": 16,
+                        "weekly_budget_dollars": 75,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            old_env = os.environ.copy()
+            try:
+                os.environ.update(
+                    {
+                        "SESSION_DIR": str(sessions),
+                        "ARCHIVE_DIR": str(archive),
+                        "CONFIG_FILE": str(config_file),
+                        "CACHE_FILE": str(cache_file),
+                    }
+                )
+                output = StringIO()
+                args = type("Args", (), {"amount": 87})()
+                with redirect_stdout(output):
+                    core.cmd_set_budget(args)
+            finally:
+                os.environ.clear()
+                os.environ.update(old_env)
+
+            cached = json.loads(cache_file.read_text(encoding="utf-8"))
+            self.assertEqual(cached["dollars_limit"], 87)
+            self.assertIn("菜单栏缓存已刷新", output.getvalue())
+
     def test_menu_explains_calibration_before_single_action(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
