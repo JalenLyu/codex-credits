@@ -12,6 +12,8 @@ bash install.sh --with-barrage     # 菜单栏 + 终端 + 弹幕通知
 ```
 
 菜单栏自动配置（`defaults write` 预设插件目录），装了 SwiftBar 就出现。
+默认安装会关闭旧的弹幕钩子；只有显式使用 `--with-barrage` 才会启用弹幕通知。
+Codex 每次工具调用后会通过 `PostToolUse` 自动刷新菜单栏缓存，SwiftBar 读取缓存后显示最新预算。
 
 如果菜单栏没有显示：
 

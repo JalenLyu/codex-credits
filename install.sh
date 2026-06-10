@@ -152,12 +152,24 @@ if not any("codex-credits-cache.sh" in json.dumps(item) for item in post_tool_us
     post_tool_use.append({"hooks": [{"command": cache_command, "timeout": 30, "type": "command"}]})
     print("PostToolUse 缓存钩子已添加")
 
+def remove_barrage_hooks():
+    stop_hooks = hooks.get("Stop", [])
+    filtered = [item for item in stop_hooks if "codex-barrage.sh" not in json.dumps(item)]
+    removed = len(filtered) != len(stop_hooks)
+    if filtered:
+        hooks["Stop"] = filtered
+    else:
+        hooks.pop("Stop", None)
+    return removed
+
 if mode == "--with-barrage":
+    remove_barrage_hooks()
     stop_hooks = hooks.setdefault("Stop", [])
     barrage_command = f"/bin/bash {proj_dir}/scripts/codex-barrage.sh"
-    if not any("codex-barrage.sh" in json.dumps(item) for item in stop_hooks):
-        stop_hooks.append({"hooks": [{"command": barrage_command, "timeout": 10, "type": "command"}]})
-        print("Stop 弹幕钩子已添加")
+    stop_hooks.append({"hooks": [{"command": barrage_command, "timeout": 10, "type": "command"}]})
+    print("Stop 弹幕钩子已添加")
+elif remove_barrage_hooks():
+    print("Stop 弹幕钩子已关闭")
 
 hooks_file.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 PYEOF
@@ -189,6 +201,8 @@ echo "       $PLUGIN_DIR/codex.10s.sh"
 echo "    4. 手动预览: bash $PROJ_DIR/scripts/codex-menu-bar.sh"
 if [ "$MODE" = "--with-barrage" ]; then
     echo "  弹幕:     会话结束自动弹出"
+else
+    echo "  弹幕:     默认关闭（需要时运行 bash install.sh --with-barrage）"
 fi
 echo ""
 echo "  重新安装:  bash install.sh --with-barrage"

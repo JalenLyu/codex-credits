@@ -19,7 +19,7 @@ def make_fake_bin(root):
     return bin_dir
 
 
-def run_install(home, extra_env=None):
+def run_install(home, args=None, extra_env=None):
     fake_bin = make_fake_bin(home)
     env = os.environ.copy()
     env.update(
@@ -34,7 +34,7 @@ def run_install(home, extra_env=None):
     if extra_env:
         env.update(extra_env)
     return subprocess.run(
-        ["bash", "install.sh"],
+        ["bash", "install.sh", *(args or [])],
         cwd=ROOT,
         env=env,
         text=True,
@@ -59,9 +59,12 @@ class InstallTest(unittest.TestCase):
             config = json.loads((home / ".codex-credits.json").read_text(encoding="utf-8"))
             self.assertEqual(config["weekly_budget_dollars"], 75)
             self.assertIn("alias codex=", (home / ".zshrc").read_text(encoding="utf-8"))
-            self.assertIn("PostToolUse", (home / ".codex" / "hooks.json").read_text(encoding="utf-8"))
+            hooks_text = (home / ".codex" / "hooks.json").read_text(encoding="utf-8")
+            self.assertIn("PostToolUse", hooks_text)
+            self.assertNotIn("codex-barrage.sh", hooks_text)
             self.assertIn("菜单栏显示", result.stdout)
             self.assertIn("SwiftBar", result.stdout)
+            self.assertIn("弹幕:     默认关闭", result.stdout)
 
     def test_install_preserves_existing_calibration(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -84,6 +87,51 @@ class InstallTest(unittest.TestCase):
             self.assertEqual(config["reset_weekday"], "Wednesday")
             self.assertEqual(config["reset_hour"], 9)
             self.assertEqual(config["reset_minute"], 30)
+
+    def test_default_install_removes_existing_barrage_hook(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            hooks_file = home / ".codex" / "hooks.json"
+            hooks_file.parent.mkdir(parents=True)
+            hooks_file.write_text(
+                json.dumps(
+                    {
+                        "hooks": {
+                            "PostToolUse": [],
+                            "Stop": [
+                                {
+                                    "hooks": [
+                                        {
+                                            "command": "/bin/bash /old/path/scripts/codex-barrage.sh",
+                                            "timeout": 10,
+                                            "type": "command",
+                                        }
+                                    ]
+                                }
+                            ],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_install(home)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            hooks = json.loads(hooks_file.read_text(encoding="utf-8"))
+            self.assertNotIn("codex-barrage.sh", json.dumps(hooks))
+            self.assertIn("弹幕钩子已关闭", result.stdout)
+
+    def test_with_barrage_installs_stop_hook(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+
+            result = run_install(home, args=["--with-barrage"])
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            hooks = json.loads((home / ".codex" / "hooks.json").read_text(encoding="utf-8"))
+            self.assertIn("codex-barrage.sh", json.dumps(hooks))
+            self.assertIn("会话结束自动弹出", result.stdout)
 
 
 if __name__ == "__main__":

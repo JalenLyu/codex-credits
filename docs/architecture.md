@@ -109,6 +109,7 @@ Stop          → codex-barrage.sh          ← 弹幕模式可选
 #### PostToolUse 钩子
 
 默认安装。每次 Codex 工具调用后立即触发，执行 `codex-credits-cache.sh`。
+因此正常跑 Codex 后，菜单栏预算会自动跟着更新；SwiftBar 仍按 `codex.10s.sh` 的周期读取最新缓存。
 
 流程：
 ```
@@ -128,6 +129,7 @@ Stop          → codex-barrage.sh          ← 弹幕模式可选
 #### Stop 钩子
 
 仅 `--with-barrage` 安装。Codex 会话结束后触发，执行 `codex-barrage.sh`。
+默认安装会移除旧的 Codex Credits 弹幕钩子，避免其他用户装完后自动弹通知。
 
 流程：
 ```
